@@ -52,18 +52,24 @@ export class StockService {
         .setParameters({ id: variant.id, quantity: dto.quantity })
         .execute();
 
-      if (result.affected === 0) {
+      // Anything other than exactly one updated row means the movement was not
+      // applied, so nothing may be recorded.
+      if (result.affected !== 1) {
+        const current = await manager.findOneOrFail(ProductVariant, { where: { id: variant.id } });
+
         throw new ConflictException(
           `Stock insuficiente para el SKU "${dto.sku}": ` +
-            `hay ${variant.stock} unidades y se intentan sacar ${Math.abs(dto.quantity)}`,
+            `hay ${current.stock} unidades y se intentan sacar ${Math.abs(dto.quantity)}`,
         );
       }
 
       const updated = await manager.findOneOrFail(ProductVariant, { where: { id: variant.id } });
 
+      // Only the id of the variant is linked: the object read above still holds
+      // the old stock and must never be written back.
       const movement = await manager.save(
         manager.create(StockMovement, {
-          variant,
+          variant: { id: variant.id },
           quantity: dto.quantity,
           reason: dto.reason,
           resultingStock: updated.stock,

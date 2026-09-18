@@ -209,6 +209,12 @@ tener que ir sumando fila por fila. Para una tabla de auditoría es información
 - **La validación del body** está en [create-movement.dto.ts](../src/stock/dto/create-movement.dto.ts)
   con `class-validator`. El `ValidationPipe` global ya venía configurado con `whitelist` y
   `forbidNonWhitelisted`, así que un campo de más también se rechaza.
+- **La cantidad tiene un tope de un millón de unidades** por movimiento. No es un número de negocio
+  elegido al azar: la columna `stock` es un entero de 4 bytes, que en PostgreSQL no pasa de
+  2.147.483.647. Sin el tope, una cantidad más grande que eso fallaba dentro de la base y salía como
+  `500`, cuando en realidad es un dato inválido que se tiene que rechazar antes de tocar la base.
+  Un millón deja muchísimo margen para cualquier movimiento real y mantiene los números lejos del
+  límite técnico. Lo encontré probando casos borde, no leyendo el código.
 
 ## Limitación conocida de SQLite
 

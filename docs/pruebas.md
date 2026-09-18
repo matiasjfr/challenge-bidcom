@@ -100,6 +100,19 @@ curl -i -X POST localhost:3000/stock/movimientos -H 'Content-Type: application/j
 # {"message":["property otro should not exist"],"error":"Bad Request","statusCode":400}
 ```
 
+Una cantidad más grande de lo que la columna soporta también se rechaza acá, antes de llegar a la
+base:
+
+```bash
+curl -i -X POST localhost:3000/stock/movimientos -H 'Content-Type: application/json' \
+  -d '{"sku":"ZAP-42-NEG","quantity":3000000000,"reason":"RESTOCK"}'
+# {"message":["quantity must not be greater than 1000000"],"error":"Bad Request","statusCode":400}
+```
+
+Otros casos que devuelven `400`: cantidad decimal, cantidad como texto, cantidad nula, SKU vacío,
+SKU que no es texto, motivo en minúscula y JSON mal formado. Un SKU con espacios de más
+(`"  ZAP-42-NEG  "`) sí se acepta: se limpian antes de buscar.
+
 ## Consultar el estado
 
 ```bash
@@ -178,6 +191,47 @@ Resultado esperado, y el que se obtiene:
 
 Cinco movimientos en el historial que suman -10, stock final 0 y ninguna unidad vendida de más. Sin
 el update condicional, varios pedidos leerían el mismo stock y el número final quedaría en negativo.
+
+### La última unidad
+
+El caso más directo: una sola unidad disponible y ocho pedidos al mismo tiempo. Solo uno puede
+ganar.
+
+```bash
+# dejar ZAP-43-NEG con una unidad
+curl -s -X POST localhost:3000/stock/movimientos -H 'Content-Type: application/json' \
+  -d '{"sku":"ZAP-43-NEG","quantity":1,"reason":"RESTOCK"}'
+
+for i in $(seq 1 8); do
+  curl -s -o /dev/null -w "%{http_code} " -X POST localhost:3000/stock/movimientos \
+    -H 'Content-Type: application/json' \
+    -d '{"sku":"ZAP-43-NEG","quantity":-1,"reason":"PURCHASE"}' &
+done
+wait
+```
+
+```
+201 409 409 409 409 409 409 409
+```
+
+### No se pierde ninguna escritura
+
+Diez entradas y diez salidas al mismo tiempo sobre una variante con 20 unidades. Ninguna puede
+fallar, y el stock final tiene que volver a ser exactamente 20: si dos movimientos se pisaran, el
+número quedaría distinto.
+
+```bash
+for i in $(seq 1 10); do
+  curl -s -o /dev/null -w "%{http_code} " -X POST localhost:3000/stock/movimientos \
+    -H 'Content-Type: application/json' -d '{"sku":"ZAP-42-NEG","quantity":1,"reason":"RETURN"}' &
+  curl -s -o /dev/null -w "%{http_code} " -X POST localhost:3000/stock/movimientos \
+    -H 'Content-Type: application/json' -d '{"sku":"ZAP-42-NEG","quantity":-1,"reason":"PURCHASE"}' &
+done
+wait
+
+curl -s localhost:3000/stock/ZAP-42-NEG
+# 20 respuestas 201 y {"sku":"ZAP-42-NEG","stock":20}
+```
 
 ## Antes de entregar
 
