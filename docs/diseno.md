@@ -39,6 +39,22 @@ La separación en dos módulos sigue la división natural del dominio: `catalog`
 vende, `stock` es dueño de cuánto hay y de la historia de cómo llegó a ese número. `catalog` no
 conoce a `stock`; la dependencia va en una sola dirección.
 
+## Qué base de datos uso
+
+**Elijo SQLite**, que es con lo que la solución corre por defecto: no hay que instalar nada, y para
+el tamaño del problema alcanza de sobra.
+
+El soporte de PostgreSQL ya venía armado en el boilerplate (la elección de motor en
+[app.module.ts](../src/app.module.ts), el `docker-compose.yml` y el `.env.example`). No lo saqué
+porque no cuesta nada mantenerlo y me sirvió para una cosa concreta: **probar los pedidos
+simultáneos**. El driver de SQLite abre una sola conexión y no admite dos transacciones a la vez,
+así que la prueba que valida la decisión más importante del diseño —que no se pueda vender la misma
+unidad dos veces— no se puede hacer contra SQLite. Contra PostgreSQL sí, y el resultado está más
+abajo.
+
+El código de la solución no sabe con qué motor corre: las entidades, el servicio y la validación son
+los mismos en los dos casos.
+
 ## Endpoints
 
 ### `POST /stock/movimientos`
