@@ -40,6 +40,35 @@ El formato, ubicación y nivel de detalle quedan a tu criterio. Forma parte de l
 
 ---
 
+## La solución
+
+- **[docs/diseno.md](docs/diseno.md)** — cómo entendí el problema, el modelo de datos y el porqué de
+  cada decisión (cantidad con signo, cómo se evita el stock negativo, qué quedó afuera).
+- **[docs/pruebas.md](docs/pruebas.md)** — cómo levantarla y un comando por cada caso, incluida la
+  prueba de pedidos simultáneos.
+
+Arranque rápido:
+
+```bash
+npm install
+cp .env.example .env
+npm run seed          # datos de ejemplo: ZAP-42-NEG (stock 10) y ZAP-43-NEG (stock 0)
+npm run start:dev
+```
+
+```bash
+curl -X POST localhost:3000/stock/movimientos -H 'Content-Type: application/json' \
+  -d '{"sku":"ZAP-42-NEG","quantity":-2,"reason":"PURCHASE"}'
+```
+
+| Endpoint | Qué hace |
+| --- | --- |
+| `POST /stock/movimientos` | registra un movimiento y actualiza el stock |
+| `GET /stock/:sku` | stock disponible de una variante |
+| `GET /stock/:sku/movimientos` | historial de movimientos |
+
+---
+
 ## About this repository
 
 This repo is the starting point for the challenge. It includes NestJS 11, TypeORM 0.3, and support for SQLite (default) or PostgreSQL 17 (via Docker).
