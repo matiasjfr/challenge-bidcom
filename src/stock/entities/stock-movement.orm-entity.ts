@@ -15,8 +15,9 @@ import { MovementReason } from '../movement-reason.enum';
  */
 @Entity('stock_movements')
 export class StockMovement {
-  @PrimaryGeneratedColumn('uuid')
-  id!: string;
+  /** Sequential on purpose: it gives the log a deterministic order. */
+  @PrimaryGeneratedColumn('increment')
+  id!: number;
 
   @Index()
   @ManyToOne(() => ProductVariant, { nullable: false })
