@@ -13,7 +13,7 @@ export class Product {
   @Column({ type: 'text' })
   description!: string;
 
-  /** Price in cents, to avoid decimal handling differences between SQLite and Postgres. */
+  /** Price in cents: a `decimal` column comes back as a string and brings rounding along. */
   @Column({ type: 'int' })
   priceCents!: number;
 

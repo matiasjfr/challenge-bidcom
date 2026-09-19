@@ -27,7 +27,7 @@ export class StockMovement {
   @Column({ type: 'int' })
   quantity!: number;
 
-  @Column({ type: 'simple-enum', enum: MovementReason })
+  @Column({ type: 'enum', enum: MovementReason })
   reason!: MovementReason;
 
   /** Stock of the variant right after this movement was applied. */

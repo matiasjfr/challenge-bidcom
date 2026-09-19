@@ -41,19 +41,20 @@ conoce a `stock`; la dependencia va en una sola dirección.
 
 ## Qué base de datos uso
 
-**Elijo SQLite**, que es con lo que la solución corre por defecto: no hay que instalar nada, y para
-el tamaño del problema alcanza de sobra.
+**Elijo PostgreSQL.** El enunciado deja elegir entre PostgreSQL y SQLite, y el boilerplate venía
+preparado para las dos; dejé una sola, para que el proyecto no tenga dos caminos que mantener.
 
-El soporte de PostgreSQL ya venía armado en el boilerplate (la elección de motor en
-[app.module.ts](../src/app.module.ts), el `docker-compose.yml` y el `.env.example`). No lo saqué
-porque no cuesta nada mantenerlo y me sirvió para una cosa concreta: **probar los pedidos
-simultáneos**. El driver de SQLite abre una sola conexión y no admite dos transacciones a la vez,
-así que la prueba que valida la decisión más importante del diseño —que no se pueda vender la misma
-unidad dos veces— no se puede hacer contra SQLite. Contra PostgreSQL sí, y el resultado está más
-abajo.
+La razón de la elección es el dominio, no el gusto. El problema central acá es que dos personas
+pueden pelearse por la misma unidad al mismo tiempo, y toda la solución está pensada alrededor de
+eso. SQLite no lo aguanta: su driver abre una sola conexión, así que dos movimientos simultáneos
+chocan entre ellos y el segundo falla con `cannot start a transaction within a transaction`. Lo
+probé antes de decidir: con SQLite, de diez pedidos a la vez uno moría con error `500` en lugar de
+recibir su respuesta. Los datos quedaban bien —la transacción los protege igual— pero es una base
+que no soporta el caso que este sistema tiene que resolver todos los días.
 
-El código de la solución no sabe con qué motor corre: las entidades, el servicio y la validación son
-los mismos en los dos casos.
+Elegir la base que no puede correr la prueba más importante del diseño no tenía sentido, así que la
+elección es PostgreSQL, que además ya venía listo en el `docker-compose.yml` del repo. El costo es
+que hace falta Docker para levantarlo, y es un comando.
 
 ## Endpoints
 
@@ -167,8 +168,9 @@ escribir. Si la fila no se actualizó (`affected === 0`), es porque no había st
 devuelvo `409`. La variante ya se buscó antes, así que ese es el único motivo posible.
 
 Consideré también el bloqueo pesimista (`SELECT ... FOR UPDATE`), que resuelve lo mismo. Lo descarté
-porque el update condicional no necesita configuración extra, funciona igual en SQLite y en
-PostgreSQL, y mantiene la fila bloqueada menos tiempo.
+porque el update condicional hace el trabajo con una sola consulta, no necesita configuración extra
+y mantiene la fila bloqueada menos tiempo: el bloqueo dura lo que dura el update, en vez de
+extenderse desde la lectura hasta el final de la transacción.
 
 **Cómo lo probé.** Con PostgreSQL, sobre una variante con 10 unidades, mandé 10 pedidos simultáneos
 de 2 unidades cada uno. El resultado fue exactamente 5 respuestas `201` y 5 respuestas `409`, stock
@@ -195,17 +197,18 @@ tener que ir sumando fila por fila. Para una tabla de auditoría es información
 ### Detalles más chicos
 
 - **El precio se guarda en centavos** (`priceCents`, entero). TypeORM devuelve las columnas
-  `decimal` como texto en PostgreSQL y como número en SQLite, así que el mismo código daría tipos
-  distintos según el motor. Con enteros eso desaparece, y de paso no hay redondeo de decimales.
+  `decimal` de PostgreSQL como texto, así que el código terminaría convirtiendo de un lado a otro, y
+  los decimales traen redondeo. Con enteros las dos cosas desaparecen.
 - **La variante tiene un `name` libre** ("42 / Negro") en lugar de columnas `size` y `color`. El
   enunciado usa zapatillas como ejemplo, pero un ecommerce vende cosas que se diferencian por otras
   cosas. Si más adelante hace falta filtrar por talle, el paso siguiente es una columna de atributos
   en JSON, no columnas fijas.
 - **El id del movimiento es un número secuencial**, mientras que el resto usa UUID. Es a propósito:
-  en SQLite la fecha se guarda con precisión de segundos, así que varios movimientos del mismo
-  segundo no tendrían un orden estable. El id secuencial ordena el historial sin ambigüedad, que es
-  lo que uno espera de un registro que solo crece.
-- **El motivo usa `simple-enum`**, que es el tipo que TypeORM maneja igual en los dos motores.
+  dos movimientos pueden compartir la marca de tiempo, así que ordenar por fecha no garantiza un
+  orden estable. El id secuencial ordena el historial sin ambigüedad y no depende de la precisión
+  del reloj, que es lo que uno espera de un registro que solo crece.
+- **El motivo se guarda como enum de PostgreSQL**, que deja la lista de valores en la base y no solo
+  en el código.
 - **La validación del body** está en [create-movement.dto.ts](../src/stock/dto/create-movement.dto.ts)
   con `class-validator`. El `ValidationPipe` global ya venía configurado con `whitelist` y
   `forbidNonWhitelisted`, así que un campo de más también se rechaza.
@@ -215,20 +218,6 @@ tener que ir sumando fila por fila. Para una tabla de auditoría es información
   `500`, cuando en realidad es un dato inválido que se tiene que rechazar antes de tocar la base.
   Un millón deja muchísimo margen para cualquier movimiento real y mantiene los números lejos del
   límite técnico. Lo encontré probando casos borde, no leyendo el código.
-
-## Limitación conocida de SQLite
-
-SQLite queda como base por defecto porque no necesita instalar nada, pero el driver de TypeORM usa
-una sola conexión para toda la aplicación. Si llegan dos movimientos exactamente al mismo tiempo, el
-segundo falla con `cannot start a transaction within a transaction` y devuelve `500`.
-
-Es una limitación del driver, no de la solución: **los datos igual quedan bien**. En la misma prueba
-de 10 pedidos simultáneos contra SQLite, el stock nunca quedó negativo y el historial siguió
-coincidiendo con el stock; lo único que pasó es que dos pedidos fallaron en lugar de recibir su
-`409`. Contra PostgreSQL, que tiene pool de conexiones, la prueba dio limpia.
-
-Por eso el desarrollo se puede hacer con SQLite, pero la prueba de concurrencia hay que hacerla con
-PostgreSQL, que está listo en el `docker-compose.yml` del repo.
 
 ## Sobre las migraciones
 

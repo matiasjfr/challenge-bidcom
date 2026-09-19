@@ -4,10 +4,13 @@ Las decisiones de diseño están explicadas en [diseno.md](diseno.md).
 
 ## Levantar el proyecto
 
+La base es PostgreSQL y el repo ya trae el `docker-compose.yml`, así que no hay que instalarla:
+
 ```bash
+docker compose up -d      # levanta PostgreSQL
 npm install
 cp .env.example .env
-npm run seed        # crea los datos de ejemplo
+npm run seed              # crea los datos de ejemplo
 npm run start:dev
 ```
 
@@ -18,8 +21,8 @@ El seed crea una categoría, un producto y dos variantes:
 | `ZAP-42-NEG` | 10 | probar entradas y salidas |
 | `ZAP-43-NEG` | 0 | probar el caso de stock insuficiente |
 
-Correr el seed dos veces no duplica nada. Para empezar de cero, borrar `database.sqlite` y volver a
-correrlo.
+Correr el seed dos veces no duplica nada. Para empezar de cero: `docker compose down -v`, levantarlo
+de nuevo y volver a sembrar.
 
 Verificar que la aplicación levantó:
 
@@ -140,33 +143,8 @@ historia se desincronizaron, que es exactamente lo que la transacción evita.
 
 ## Prueba de pedidos simultáneos
 
-Esta es la prueba que justifica cómo se descuenta el stock, y **hay que hacerla contra
-PostgreSQL**: el driver de SQLite usa una sola conexión y no soporta transacciones en paralelo (está
-explicado en [diseno.md](diseno.md#limitación-conocida-de-sqlite)).
-
-Levantar PostgreSQL:
-
-```bash
-docker compose up -d
-```
-
-Cambiar el `.env`:
-
-```env
-DB_TYPE=postgres
-DB_HOST=localhost
-DB_PORT=5432
-DB_USERNAME=postgres
-DB_PASSWORD=postgres
-DB_DATABASE=ecommerce_challenge
-```
-
-Sembrar y arrancar:
-
-```bash
-npm run seed
-npm run start:dev
-```
+Esta es la prueba que justifica cómo se descuenta el stock: es el caso que un `if` en el código no
+puede resolver. No hace falta preparar nada aparte de lo de arriba.
 
 Con `ZAP-42-NEG` en 10 unidades, mandar 10 pedidos de 2 unidades al mismo tiempo. Solo 5 pueden
 entrar:

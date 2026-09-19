@@ -47,9 +47,11 @@ El formato, ubicación y nivel de detalle quedan a tu criterio. Forma parte de l
 - **[docs/pruebas.md](docs/pruebas.md)** — cómo levantarla y un comando por cada caso, incluida la
   prueba de pedidos simultáneos.
 
+La base es **PostgreSQL** (el porqué está en [docs/diseno.md](docs/diseno.md#qué-base-de-datos-uso)).
 Arranque rápido:
 
 ```bash
+docker compose up -d  # levanta PostgreSQL
 npm install
 cp .env.example .env
 npm run seed          # datos de ejemplo: ZAP-42-NEG (stock 10) y ZAP-43-NEG (stock 0)
@@ -71,7 +73,7 @@ curl -X POST localhost:3000/stock/movimientos -H 'Content-Type: application/json
 
 ## About this repository
 
-This repo is the starting point for the challenge. It includes NestJS 11, TypeORM 0.3, and support for SQLite (default) or PostgreSQL 17 (via Docker).
+This repo is the starting point for the challenge. It includes NestJS 11, TypeORM 0.3, and PostgreSQL 17 (via Docker). The boilerplate also shipped SQLite support; this solution runs on PostgreSQL only, and the reason is in [docs/diseno.md](docs/diseno.md#qué-base-de-datos-uso).
 
 TypeScript is configured in strict mode with sensible additional rules (`noUncheckedIndexedAccess`, explicit return types, no `any`, no floating promises, etc.). Run `npm run typecheck` and `npm run lint` before submitting.
 
@@ -93,6 +95,7 @@ nvm use
 ## Installation
 
 ```bash
+docker compose up -d
 npm install
 cp .env.example .env
 ```
@@ -109,16 +112,15 @@ The app runs at `http://localhost:3000`. Verify it started with:
 curl http://localhost:3000/health
 ```
 
-## PostgreSQL with Docker (optional)
+## PostgreSQL with Docker
 
 ```bash
 docker compose up -d
 ```
 
-Then update `.env`:
+The values in `.env.example` already point to this container:
 
 ```env
-DB_TYPE=postgres
 DB_HOST=localhost
 DB_PORT=5432
 DB_USERNAME=postgres
